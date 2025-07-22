@@ -36,8 +36,6 @@ logs/
 *.swp
 *.swo
 
-# Kiro
-.kiro/
 
 # Jupyter
 .ipynb_checkpoints
