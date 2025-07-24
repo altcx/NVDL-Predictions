@@ -58,7 +58,7 @@ The system follows a modular architecture with the following components:
 
 ### Prerequisites
 - Python 3.8 or higher
-- Alpaca Markets API account (free at [alpaca.markets](https://alpaca.markets/))
+- Alpaca Markets API account (free at [alpaca.markets](https://alpaca.markets/)) make sure to not push ur keys anywhere lol
 
 ### Setup Steps
 
