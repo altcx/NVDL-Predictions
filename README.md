@@ -308,7 +308,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Disclaimer
 
-⚠️ **Important**: This software is for educational and research purposes only. It should not be used as the sole basis for investment decisions. Past performance does not guarantee future results. Always consult with a qualified financial advisor before making investment decisions.
+**Important**: This software is for educational and research purposes only. It should not be used as the sole basis for investment decisions. Past performance does not guarantee future results. Always consult with a qualified financial advisor before making investment decisions. I am going to crash out ngl i've been sitting here for 12 hours
 
 ## Support
 
@@ -327,4 +327,4 @@ For questions, issues, or feature requests:
 
 ---
 
-**Star ⭐ this repository if you find it useful!**
+**Star this repository if you find it useful!**
