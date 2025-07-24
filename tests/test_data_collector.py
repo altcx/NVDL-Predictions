@@ -11,6 +11,12 @@ from alpaca.common.exceptions import APIError
 from alpaca.data.timeframe import TimeFrame
 
 from data.collector import DataCollector
+from utils.error_handler import (
+    APIConnectionError, DataValidationError, 
+    InsufficientDataError, DataIntegrityError
+)
+# Use built-in TimeoutError for tests
+from socket import timeout as TimeoutError
 
 
 class TestDataCollector:
@@ -149,7 +155,8 @@ class TestDataCollector:
         ]
         
         with patch('time.sleep'):  # Mock sleep to speed up test
-            result = data_collector.fetch_historical_data('NVDL', '2023-01-01', '2023-01-31')
+            with patch('utils.error_handler.ErrorHandler._run_with_timeout', side_effect=lambda func, timeout: func()):
+                result = data_collector.fetch_historical_data('NVDL', '2023-01-01', '2023-01-31')
         
         assert isinstance(result, pd.DataFrame)
         assert data_collector.client.get_stock_bars.call_count == 3
@@ -159,10 +166,26 @@ class TestDataCollector:
         data_collector.client.get_stock_bars.side_effect = APIError("Persistent error")
         
         with patch('time.sleep'):  # Mock sleep to speed up test
-            with pytest.raises(APIError):
-                data_collector.fetch_historical_data('NVDL', '2023-01-01', '2023-01-31')
+            with patch('utils.error_handler.ErrorHandler._run_with_timeout', side_effect=lambda func, timeout: func()):
+                with pytest.raises(APIConnectionError):
+                    data_collector.fetch_historical_data('NVDL', '2023-01-01', '2023-01-31')
         
         assert data_collector.client.get_stock_bars.call_count == 3
+        
+    def test_fetch_historical_data_rate_limit_error(self, data_collector):
+        """Test API rate limit error handling"""
+        data_collector.client.get_stock_bars.side_effect = APIError("Rate limit exceeded")
+        
+        with patch('time.sleep'):  # Mock sleep to speed up test
+            with patch('utils.error_handler.ErrorHandler._run_with_timeout', side_effect=lambda func, timeout: func()):
+                with pytest.raises(APIConnectionError):
+                    data_collector.fetch_historical_data('NVDL', '2023-01-01', '2023-01-31')
+    
+    def test_fetch_historical_data_timeout_error(self, data_collector):
+        """Test API timeout error handling"""
+        with patch('utils.error_handler.ErrorHandler._run_with_timeout', side_effect=TimeoutError("Request timed out")):
+            with pytest.raises(TimeoutError):
+                data_collector.fetch_historical_data('NVDL', '2023-01-01', '2023-01-31')
     
     def test_validate_data_completeness_valid_data(self, data_collector, sample_ohlcv_data):
         """Test data validation with valid data"""
@@ -172,8 +195,8 @@ class TestDataCollector:
     def test_validate_data_completeness_empty_data(self, data_collector):
         """Test data validation with empty DataFrame"""
         empty_df = pd.DataFrame()
-        result = data_collector.validate_data_completeness(empty_df)
-        assert result is False
+        with pytest.raises(DataValidationError):
+            data_collector.validate_data_completeness(empty_df)
     
     def test_validate_data_completeness_insufficient_data(self, data_collector):
         """Test data validation with insufficient data points"""
@@ -184,8 +207,8 @@ class TestDataCollector:
             'close': [100.5],
             'volume': [10000]
         })
-        result = data_collector.validate_data_completeness(small_df, min_data_points=100)
-        assert result is False
+        with pytest.raises(InsufficientDataError):
+            data_collector.validate_data_completeness(small_df, min_data_points=100)
     
     def test_validate_data_completeness_missing_columns(self, data_collector):
         """Test data validation with missing columns"""
@@ -195,8 +218,8 @@ class TestDataCollector:
             'close': [100.5, 101.5]
             # Missing 'low' and 'volume' columns
         })
-        result = data_collector.validate_data_completeness(incomplete_df)
-        assert result is False
+        with pytest.raises(DataValidationError):
+            data_collector.validate_data_completeness(incomplete_df)
     
     def test_validate_data_completeness_negative_prices(self, data_collector):
         """Test data validation with negative prices"""
@@ -207,8 +230,8 @@ class TestDataCollector:
             'close': [100.5, 101.5],
             'volume': [10000, 20000]
         })
-        result = data_collector.validate_data_completeness(invalid_df)
-        assert result is False
+        with pytest.raises(DataIntegrityError):
+            data_collector.validate_data_completeness(invalid_df)
     
     def test_validate_data_completeness_invalid_ohlc(self, data_collector):
         """Test data validation with invalid OHLC relationships"""
@@ -219,8 +242,8 @@ class TestDataCollector:
             'close': [100.5, 101.5],
             'volume': [10000, 20000]
         })
-        result = data_collector.validate_data_completeness(invalid_df)
-        assert result is False
+        with pytest.raises(DataIntegrityError):
+            data_collector.validate_data_completeness(invalid_df)
     
     def test_handle_missing_data_forward_fill(self, data_collector, sample_ohlcv_data):
         """Test missing data handling with forward fill"""
@@ -258,7 +281,7 @@ class TestDataCollector:
     
     def test_handle_missing_data_invalid_method(self, data_collector, sample_ohlcv_data):
         """Test missing data handling with invalid method"""
-        with pytest.raises(ValueError, match="Unknown method"):
+        with pytest.raises(DataValidationError):
             data_collector.handle_missing_data(sample_ohlcv_data, method='invalid_method')
     
     def test_handle_missing_data_empty_dataframe(self, data_collector):
